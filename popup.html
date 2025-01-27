@@ -7,8 +7,8 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
     body {
-      width: 400px;
-      min-height: 500px;
+      width: 450px;
+      min-height: 550px;
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
 
@@ -47,51 +47,53 @@
       from { opacity: 0; transform: translateY(-10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-  </style>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: '#3b82f6',
-          }
-        }
-      }
+
+    .glass-header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(5px);
+      border-bottom: 1px solid rgba(229, 231, 235, 0.8);
     }
-  </script>
+  </style>
 </head>
 <body class="bg-gray-50">
-  <div class="container p-4 mx-auto">
-    <div class="mb-6 text-center">
-      <h1 class="text-2xl font-bold text-gray-800 mb-2">BugTrace</h1>
-      <p class="text-sm text-gray-600">Network Request Recorder</p>
-    </div>
-
-    <div class="space-y-4">
-      <div class="flex justify-center">
-        <button id="recordButton" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
-          <span class="button-content flex items-center space-x-2">
-            <i class="fas fa-circle text-sm"></i>
-            <span class="button-text">Start Recording</span>
-            <span class="spinner ml-2"></span>
-          </span>
+  <!-- Header -->
+  <header class="glass-header fixed top-0 left-0 right-0 z-50 px-4 py-3 shadow-sm">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <i class="fas fa-bug text-blue-600 text-xl"></i>
+        <h1 class="text-lg font-semibold text-gray-800">BugTrace</h1>
+      </div>
+      <div>
+        <button id="recordButton" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+          <span class="spinner mr-2"></span>
+          <i class="fas fa-circle text-xs mr-2"></i>
+          <span class="button-text">Start Recording</span>
         </button>
       </div>
+    </div>
+  </header>
 
-      <div id="status" class="text-sm text-center text-gray-600 h-6"></div>
+  <!-- Main Content -->
+  <main class="mt-16 p-4">
+    <!-- Status Messages -->
+    <div id="status" class="mb-4 px-4 py-2 rounded-lg text-sm font-medium"></div>
 
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="p-4 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-800">Recorded Sessions</h2>
-        </div>
-        <div id="sessionsList" class="divide-y divide-gray-200">
-          <div class="p-4 text-center text-gray-500 text-sm">
-            No recorded sessions yet
-          </div>
-        </div>
+    <!-- Sessions Section -->
+    <div class="bg-white rounded-lg shadow">
+      <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+        <h2 class="text-lg font-medium text-gray-900">Recorded Sessions</h2>
+        <button id="deleteAllButton" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+          <i class="fas fa-trash-alt text-gray-400 mr-2"></i>
+          Delete All
+        </button>
+      </div>
+      
+      <div id="sessionsList" class="divide-y divide-gray-200">
+        <!-- Sessions will be dynamically inserted here -->
       </div>
     </div>
-  </div>
+  </main>
+
   <script src="popup.js"></script>
 </body>
 </html>

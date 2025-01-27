@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Bugtrace Plugin",
+  "name": "BugTrace",
   "version": "1.0",
-  "description": "Record and export network traffic for debugging",
+  "description": "Record and analyze network requests for debugging",
   "permissions": [
-    "webRequest",
+    "storage",
     "downloads",
-    "storage"
+    "webRequest",
+    "debugger",
+    "tabs",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "<all_urls>"

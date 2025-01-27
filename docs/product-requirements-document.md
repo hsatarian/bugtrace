@@ -26,27 +26,32 @@
 ## 4. Export Format
 
 ### 4.1 Main Export File: `network_summary.json`
-- **JSON Structure**:
-  ```json
-  {
-    "metadata": {
-      "start_time": "2025-01-26T19:30:11.123Z",
-      "end_time": "2025-01-26T19:35:22.456Z",
-      "total_requests": 42
-    },
-    "requests": [
-      {
-        "id": "#1",
-        "timestamp": "2025-01-26T19:30:12.345Z",
-        "url": "https://api.example.com/data?param=value",
-        "method": "GET",
-        "request_payload": {
-          "form_params": { /* form data here */ },
-          "json_body": { /* JSON body here */ }
-        },
-        "stack_trace": "Error: ...\n    at ...",
-        "response_reference": "response_1.json"
-      }
-      // ...
-    ]
-  }
+```json
+{
+  "metadata": {
+    "start_time": "2025-01-26T19:30:11.123Z",
+    "end_time": "2025-01-26T19:35:22.456Z",
+    "total_requests": 42
+  },
+  "requests": [
+    {
+      "id": "#request123",
+      "timestamp": "2025-01-26T20:00:00.000Z",
+      "url": "https://api.example.com/data",
+      "method": "POST",
+      "payload": {
+        "key": "value"
+      },
+      "response_reference": "response_123.json"
+    }
+  ]
+}
+```
+
+### 4.2 Detailed Response File: `response_[id].json`
+```json
+{
+  "stack_trace": "full stack trace",
+  "response": "full response"
+}
+```

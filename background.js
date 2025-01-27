@@ -1,289 +1,324 @@
-let networkRequests = new Map(); // Map of sessionId -> requests array
+// Import JSZip
+importScripts('lib/jszip.min.js');
+
 let isRecording = false;
 let currentSessionId = null;
+let currentTabId = null;
 
-console.log('Background script initialized');
+// Initialize storage
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.set({ sessions: [], networkData: {} });
+});
 
-// Load JSZip
-self.importScripts('lib/jszip.min.js');
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('Received message:', message);
+// Helper function to parse form data
+function parseFormData(formData) {
+  const result = {};
+  if (!formData) return result;
   
-  switch (message.action) {
-    case 'startRecording':
-      console.log('Starting recording for session:', message.sessionId);
-      startRecording(message.sessionId);
-      // Update storage with recording state
-      chrome.storage.local.set({ 
-        isRecording: true,
-        currentSessionId: message.sessionId 
-      }, () => {
-        sendResponse({ success: true });
+  try {
+    // Handle URL encoded form data
+    const params = new URLSearchParams(formData);
+    params.forEach((value, key) => {
+      result[key] = value;
+    });
+  } catch (e) {
+    console.error('Form data parsing error:', e);
+  }
+  return result;
+}
+
+// Get stack trace for request
+function getStackTrace() {
+  try {
+    throw new Error();
+  } catch (e) {
+    return e.stack.split('\n').slice(2).join('\n'); // Remove first two lines (Error and getStackTrace)
+  }
+}
+
+// Attach debugger when recording starts
+async function attachDebugger(tabId) {
+  try {
+    await chrome.debugger.attach({ tabId }, "1.0");
+    await chrome.debugger.sendCommand({ tabId }, "Network.enable");
+    console.log('Debugger attached successfully');
+  } catch (e) {
+    console.error('Failed to attach debugger:', e);
+  }
+}
+
+// Detach debugger when recording stops
+async function detachDebugger(tabId) {
+  try {
+    await chrome.debugger.detach({ tabId });
+    console.log('Debugger detached successfully');
+  } catch (e) {
+    console.error('Failed to detach debugger:', e);
+  }
+}
+
+// Handle debugger events
+chrome.debugger.onEvent.addListener(async (source, method, params) => {
+  if (!isRecording || source.tabId !== currentTabId) return;
+
+  if (method === "Network.responseReceived") {
+    try {
+      // Get response body
+      const response = await chrome.debugger.sendCommand(
+        { tabId: source.tabId },
+        "Network.getResponseBody",
+        { requestId: params.requestId }
+      );
+
+      // Update the request in storage with response data
+      chrome.storage.local.get(['networkData'], function(result) {
+        const networkData = result.networkData || {};
+        const requests = networkData[currentSessionId] || [];
+        const requestIndex = requests.findIndex(req => 
+          req.requestId === params.requestId
+        );
+
+        if (requestIndex !== -1) {
+          requests[requestIndex].response = response.body;
+          networkData[currentSessionId] = requests;
+          chrome.storage.local.set({ networkData: networkData });
+        }
       });
-      return true; // Keep channel open for async response
-      
-    case 'stopRecording':
-      console.log('Stopping recording for session:', message.sessionId);
-      stopRecording(message.sessionId);
-      // Update storage with recording state
-      chrome.storage.local.set({ 
-        isRecording: false,
-        currentSessionId: null 
-      }, () => {
-        sendResponse({ success: true });
-      });
-      return true; // Keep channel open for async response
-      
-    case 'exportData':
-      console.log('Starting export for session:', message.sessionId);
-      exportData(message.sessionId)
-        .then((result) => {
-          console.log('Export successful:', result);
-          sendResponse({ success: true });
-        })
-        .catch(error => {
-          console.error('Export failed:', error);
-          sendResponse({ success: false, error: error.toString() });
-        });
-      return true; // Keep message channel open for async response
+    } catch (e) {
+      console.error('Failed to get response body:', e);
+    }
   }
 });
 
-function startRecording(sessionId) {
-  isRecording = true;
-  currentSessionId = sessionId;
-  networkRequests.set(sessionId, []);
-  
-  console.log('Recording started for session:', sessionId);
-  
-  // Store session start
-  chrome.storage.local.get(['sessions'], function(result) {
-    const sessions = result.sessions || [];
-    sessions.push({
-      id: sessionId,
-      startTime: new Date().toISOString(),
-      requests: 0
-    });
-    chrome.storage.local.set({ sessions });
-  });
-}
-
-function stopRecording(sessionId) {
-  console.log('Stopping recording, requests captured:', networkRequests.get(sessionId)?.length);
-  isRecording = false;
-  currentSessionId = null;
-  
-  // Get the requests for this session
-  const requests = networkRequests.get(sessionId) || [];
-  
-  // If no requests were captured, delete the session
-  if (requests.length === 0) {
-    console.log('No requests captured, removing session:', sessionId);
-    chrome.storage.local.get(['sessions', 'networkData'], function(result) {
-      const sessions = result.sessions || [];
-      const networkData = result.networkData || {};
-      
-      // Remove session from sessions array
-      const updatedSessions = sessions.filter(s => s.id !== sessionId);
-      // Remove session data
-      delete networkData[sessionId];
-      
-      // Update storage
-      chrome.storage.local.set({ 
-        sessions: updatedSessions,
-        networkData
-      }, () => {
-        console.log('Empty session removed:', sessionId);
-      });
-    });
-    return;
-  }
-  
-  // Save network requests to storage for non-empty sessions
-  chrome.storage.local.get(['networkData'], function(result) {
-    const networkData = result.networkData || {};
-    networkData[sessionId] = requests;
-    chrome.storage.local.set({ networkData }, () => {
-      console.log('Network data saved to storage for session:', sessionId);
-    });
-  });
-  
-  // Update session info for non-empty sessions
-  chrome.storage.local.get(['sessions'], function(result) {
-    const sessions = result.sessions || [];
-    const sessionIndex = sessions.findIndex(s => s.id === sessionId);
-    if (sessionIndex !== -1) {
-      sessions[sessionIndex].requests = requests.length;
-      chrome.storage.local.set({ sessions });
-    }
-  });
-}
-
-// Set up network request listeners
+// Set up web request listener for capturing request bodies
 chrome.webRequest.onBeforeRequest.addListener(
-  logRequest,
+  function(details) {
+    if (isRecording && details.tabId === currentTabId) {
+      const timestamp = new Date().toISOString();
+      
+      chrome.storage.local.get(['networkData'], function(result) {
+        const networkData = result.networkData || {};
+        if (!networkData[currentSessionId]) {
+          networkData[currentSessionId] = [];
+        }
+        
+        let payload = {};
+        
+        // Handle URL query parameters
+        try {
+          const url = new URL(details.url);
+          const queryParams = {};
+          url.searchParams.forEach((value, key) => {
+            queryParams[key] = value;
+          });
+          if (Object.keys(queryParams).length > 0) {
+            payload = { ...payload, ...queryParams };
+          }
+        } catch (e) {
+          console.error('URL parsing error:', e);
+        }
+        
+        // Handle POST data
+        if (details.method === 'POST') {
+          if (details.requestBody) {
+            // Handle form data
+            if (details.requestBody.formData) {
+              payload = { ...payload, ...details.requestBody.formData };
+            }
+            // Handle raw form data
+            else if (details.requestBody.raw) {
+              const rawData = details.requestBody.raw[0]?.bytes;
+              if (rawData) {
+                const decoder = new TextDecoder('utf-8');
+                const formData = decoder.decode(rawData);
+                payload = { ...payload, ...parseFormData(formData) };
+              }
+            }
+          }
+        }
+
+        // Create request entry
+        const requestEntry = {
+          requestId: details.requestId,
+          url: details.url,
+          method: details.method,
+          timestamp: timestamp,
+          type: details.type,
+          tabId: details.tabId,
+          payload: payload,
+          stackTrace: getStackTrace(),
+          response: ''
+        };
+        
+        networkData[currentSessionId].push(requestEntry);
+        chrome.storage.local.set({ networkData: networkData });
+      });
+    }
+  },
   { urls: ["<all_urls>"] },
   ["requestBody"]
 );
 
-chrome.webRequest.onCompleted.addListener(
-  logResponse,
-  { urls: ["<all_urls>"] },
-  ["responseHeaders"]
-);
-
-function logRequest(details) {
-  if (!isRecording || !currentSessionId) return;
-
-  console.log('Request intercepted:', details.url);
-
-  const request = {
-    id: `#${details.requestId}`,
-    timestamp: new Date().toISOString(),
-    url: details.url,
-    method: details.method,
-    request_payload: {
-      form_params: details.requestBody ? details.requestBody.formData : null,
-      json_body: details.requestBody ? tryParseJSON(details.requestBody.raw) : null
-    },
-    stack_trace: new Error().stack,
-    response_reference: `response_${details.requestId}.json`
-  };
-
-  const sessionRequests = networkRequests.get(currentSessionId) || [];
-  sessionRequests.push(request);
-  networkRequests.set(currentSessionId, sessionRequests);
-
-  // Update request count in storage immediately
-  chrome.storage.local.get(['networkData'], function(result) {
-    const networkData = result.networkData || {};
-    networkData[currentSessionId] = sessionRequests;
-    chrome.storage.local.set({ networkData });
-  });
-}
-
-function tryParseJSON(raw) {
-  if (!raw || !raw[0]) return null;
-  try {
-    return JSON.parse(new TextDecoder().decode(raw[0].bytes));
-  } catch {
-    return null;
-  }
-}
-
-function logResponse(details) {
-  if (!isRecording || !currentSessionId) return;
+// Handle messages from popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('Received message:', request);
   
-  console.log('Response intercepted:', details.requestId);
+  switch (request.action) {
+    case 'startRecording':
+      isRecording = true;
+      currentSessionId = request.sessionId;
+      currentTabId = request.tabId;
+      
+      // Attach debugger
+      attachDebugger(currentTabId);
+      
+      // Create new session
+      chrome.storage.local.get(['sessions'], function(result) {
+        const sessions = result.sessions || [];
+        sessions.push({
+          id: currentSessionId,
+          startTime: new Date().toISOString(),
+          tabId: currentTabId
+        });
+        
+        chrome.storage.local.set({ sessions: sessions }, function() {
+          sendResponse({ success: true });
+        });
+      });
+      return true;
+      
+    case 'stopRecording':
+      const stoppingSessionId = currentSessionId;
+      
+      // Detach debugger
+      detachDebugger(currentTabId);
+      
+      // Stop recording immediately
+      isRecording = false;
+      currentSessionId = null;
+      currentTabId = null;
 
-  const sessionRequests = networkRequests.get(currentSessionId);
-  if (!sessionRequests) return;
-
-  const request = sessionRequests.find(req => req.id === `#${details.requestId}`);
-  if (request) {
-    // Store response data
-    request.response_data = {
-      status: details.statusCode,
-      headers: details.responseHeaders,
-      body: null // We can't get response bodies in MV3
-    };
-    
-    // Update storage with response
-    chrome.storage.local.get(['networkData'], function(result) {
-      const networkData = result.networkData || {};
-      networkData[currentSessionId] = sessionRequests;
-      chrome.storage.local.set({ networkData });
-    });
-  }
-}
-
-async function exportData(sessionId) {
-  console.log('Starting export process for session:', sessionId);
-  
-  // First try to get requests from storage
-  const storageData = await new Promise((resolve) => {
-    chrome.storage.local.get(['networkData'], (result) => {
-      resolve(result.networkData || {});
-    });
-  });
-
-  const requests = networkRequests.get(sessionId) || storageData[sessionId] || [];
-  console.log('Number of requests:', requests.length);
-
-  if (!requests || requests.length === 0) {
-    throw new Error('No recorded data to export for this session');
-  }
-
-  try {
-    // Create ZIP file
-    const zip = new JSZip();
-    
-    // Add network summary
-    const summary = {
-      metadata: {
-        start_time: requests[0].timestamp,
-        end_time: requests[requests.length - 1].timestamp,
-        total_requests: requests.length
-      },
-      requests: requests.map(req => ({
-        id: req.id,
-        timestamp: req.timestamp,
-        url: req.url,
-        method: req.method,
-        request_payload: req.request_payload,
-        response_status: req.response_data?.status,
-        response_headers: req.response_data?.headers,
-        response_reference: req.response_reference
-      }))
-    };
-    
-    zip.file('network_summary.json', JSON.stringify(summary, null, 2));
-    
-    // Add response files (only body and stack trace)
-    requests.forEach(req => {
-      if (req.response_data) {
-        const responseData = {
-          stack_trace: req.stack_trace,
-          response: req.response_data.body
-        };
-        zip.file(req.response_reference, JSON.stringify(responseData, null, 2));
-      }
-    });
-    
-    // Generate ZIP file
-    console.log('Generating ZIP file');
-    const content = await zip.generateAsync({
-      type: 'base64',
-      compression: 'DEFLATE',
-      compressionOptions: {
-        level: 9
-      }
-    });
-    
-    const dataUrl = 'data:application/zip;base64,' + content;
-    
-    console.log('Initiating download');
-    // Download the ZIP file
-    const downloadId = await new Promise((resolve, reject) => {
-      chrome.downloads.download({
-        url: dataUrl,
-        filename: `network_trace_${sessionId}.zip`,
-        saveAs: true
-      }, (downloadId) => {
-        if (chrome.runtime.lastError) {
-          console.error('Download error:', chrome.runtime.lastError);
-          reject(chrome.runtime.lastError);
+      // Check for requests and clean up if needed
+      chrome.storage.local.get(['sessions', 'networkData'], function(result) {
+        const networkData = result.networkData || {};
+        const sessions = result.sessions || [];
+        const sessionRequests = networkData[stoppingSessionId] || [];
+        
+        if (sessionRequests.length === 0) {
+          // Remove empty session
+          const updatedSessions = sessions.filter(s => s.id !== stoppingSessionId);
+          delete networkData[stoppingSessionId];
+          
+          chrome.storage.local.set({ 
+            sessions: updatedSessions,
+            networkData: networkData 
+          }, () => {
+            console.log('Empty session removed:', stoppingSessionId);
+            sendResponse({ success: true });
+          });
         } else {
-          console.log('Download started:', downloadId);
-          resolve(downloadId);
+          // Update session with request count
+          const sessionIndex = sessions.findIndex(s => s.id === stoppingSessionId);
+          if (sessionIndex !== -1) {
+            sessions[sessionIndex].requests = sessionRequests.length;
+            chrome.storage.local.set({ sessions }, () => {
+              sendResponse({ success: true });
+            });
+          }
         }
       });
-    });
+      return true;
+      
+    case 'exportData':
+      if (!request.sessionId) {
+        sendResponse({ success: false, error: 'No session ID provided' });
+        return true;
+      }
 
-    return { downloadId };
-  } catch (error) {
-    console.error('Export error:', error);
-    throw error;
+      chrome.storage.local.get(['networkData', 'sessions'], function(result) {
+        const networkData = result.networkData || {};
+        const sessions = result.sessions || [];
+        const sessionData = networkData[request.sessionId] || [];
+        const session = sessions.find(s => s.id === request.sessionId);
+        
+        try {
+          // Create network summary with full data
+          const summary = {
+            metadata: {
+              start_time: session?.startTime || new Date().toISOString(),
+              end_time: new Date().toISOString(),
+              total_requests: sessionData.length
+            },
+            requests: sessionData.map(req => ({
+              id: req.requestId,
+              timestamp: req.timestamp,
+              url: req.url,
+              method: req.method,
+              type: req.type,
+              payload: req.payload || {},
+              stack_trace: req.stackTrace || "",
+              response: req.response || ""
+            }))
+          };
+
+          // Create zip with single file
+          const zip = new JSZip();
+          zip.file('network_summary.json', JSON.stringify(summary, null, 2));
+
+          // Generate zip file
+          zip.generateAsync({ type: "base64" })
+            .then(function(content) {
+              const dataUrl = 'data:application/zip;base64,' + content;
+              chrome.downloads.download({
+                url: dataUrl,
+                filename: `bugtrace-session-${request.sessionId}.zip`,
+                saveAs: true
+              }, (downloadId) => {
+                if (chrome.runtime.lastError) {
+                  console.error('Export failed:', chrome.runtime.lastError);
+                  sendResponse({ 
+                    success: false, 
+                    error: chrome.runtime.lastError.message 
+                  });
+                } else {
+                  sendResponse({ success: true });
+                }
+              });
+            });
+        } catch (error) {
+          console.error('Export error:', error);
+          sendResponse({ 
+            success: false, 
+            error: error.message 
+          });
+        }
+      });
+      return true;
+
+    case 'deleteSession':
+      chrome.storage.local.get(['sessions', 'networkData'], function(result) {
+        const sessions = result.sessions || [];
+        const networkData = result.networkData || {};
+        
+        const updatedSessions = sessions.filter(s => s.id !== request.sessionId);
+        delete networkData[request.sessionId];
+        
+        chrome.storage.local.set({ 
+          sessions: updatedSessions,
+          networkData: networkData 
+        }, function() {
+          sendResponse({ success: true });
+        });
+      });
+      return true;
+
+    case 'deleteAllSessions':
+      chrome.storage.local.set({ 
+        sessions: [],
+        networkData: {} 
+      }, function() {
+        sendResponse({ success: true });
+      });
+      return true;
   }
-}
+});
