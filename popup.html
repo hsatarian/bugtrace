@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bugtrace Plugin</title>
+  <script src="lib/jszip.min.js"></script>
+  <script src="popup.js"></script>
+  <style>
+    body {
+      width: 300px;
+      padding: 10px;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      background: #0066cc;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    button:hover {
+      background: #0052a3;
+    }
+    
+    button.recording {
+      background: #cc0000;
+    }
+    
+    button.recording:hover {
+      background: #a30000;
+    }
+    
+    .session-item {
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    
+    .session-title {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    
+    .session-details {
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    
+    .session-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .export-btn {
+      background: #28a745;
+    }
+    
+    .export-btn:hover {
+      background: #218838;
+    }
+    
+    .delete-btn {
+      background: #dc3545;
+    }
+    
+    .delete-btn:hover {
+      background: #c82333;
+    }
+    
+    #status {
+      color: #666;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+    
+    .no-sessions {
+      color: #666;
+      font-style: italic;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <button id="recordButton">Start Recording</button>
+    <div id="status"></div>
+    <div id="sessionsList">
+      <div class="no-sessions">No recorded sessions yet</div>
+    </div>
+  </div>
+</body>
+</html>

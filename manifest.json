@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Bugtrace Plugin",
+  "version": "1.0",
+  "description": "Record and export network traffic for debugging",
+  "permissions": [
+    "webRequest",
+    "downloads",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
