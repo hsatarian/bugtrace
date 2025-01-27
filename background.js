@@ -74,8 +74,33 @@ function stopRecording(sessionId) {
   isRecording = false;
   currentSessionId = null;
   
-  // Save network requests to storage
+  // Get the requests for this session
   const requests = networkRequests.get(sessionId) || [];
+  
+  // If no requests were captured, delete the session
+  if (requests.length === 0) {
+    console.log('No requests captured, removing session:', sessionId);
+    chrome.storage.local.get(['sessions', 'networkData'], function(result) {
+      const sessions = result.sessions || [];
+      const networkData = result.networkData || {};
+      
+      // Remove session from sessions array
+      const updatedSessions = sessions.filter(s => s.id !== sessionId);
+      // Remove session data
+      delete networkData[sessionId];
+      
+      // Update storage
+      chrome.storage.local.set({ 
+        sessions: updatedSessions,
+        networkData
+      }, () => {
+        console.log('Empty session removed:', sessionId);
+      });
+    });
+    return;
+  }
+  
+  // Save network requests to storage for non-empty sessions
   chrome.storage.local.get(['networkData'], function(result) {
     const networkData = result.networkData || {};
     networkData[sessionId] = requests;
@@ -84,7 +109,7 @@ function stopRecording(sessionId) {
     });
   });
   
-  // Update session info
+  // Update session info for non-empty sessions
   chrome.storage.local.get(['sessions'], function(result) {
     const sessions = result.sessions || [];
     const sessionIndex = sessions.findIndex(s => s.id === sessionId);
