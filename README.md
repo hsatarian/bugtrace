@@ -15,7 +15,9 @@ A lightweight Chrome extension for recording and exporting network traffic durin
   - Complete network traffic summary
   - Individual response files with stack traces
 - 🎯 Chrome Manifest V3 compliant
-- 🔒 Secure with no external dependencies
+- 🔒 Secure with proper CSP implementation
+- 💅 Modern UI with Tailwind CSS
+- 📱 Responsive design
 
 ## Installation
 
@@ -76,23 +78,36 @@ The exported ZIP file contains:
 }
 ```
 
-## Development
+## Development Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Build CSS (one-time)
+npm run build
+
+# Watch for CSS changes during development
+npm run watch
+```
+
+### Tech Stack
+- Chrome Extension Manifest V3
+- Tailwind CSS for styling
+- Font Awesome for icons
 
 ### Project Structure
 ```
 bugtrace/
-├── manifest.json        # Extension manifest
-├── background.js       # Service worker for request capture
-├── popup.html         # Extension popup UI
-├── popup.js          # Popup interaction logic
-└── lib/             # Third-party libraries
+├── src/
+│   └── input.css      # Tailwind CSS input file
+├── dist/
+│   └── output.css     # Generated CSS
+├── popup.html         # Extension popup interface
+├── background.js      # Service worker
+├── manifest.json      # Extension manifest
+└── tailwind.config.js # Tailwind configuration
 ```
-
-### Building for Production
-
-1. Update the version in `manifest.json`
-2. ZIP the contents of the directory
-3. Upload to the Chrome Web Store
 
 ## Contributing
 
