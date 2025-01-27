@@ -39,14 +39,26 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   recordButton.addEventListener('click', function() {
-    console.log('Record button clicked, current state:', isRecording);
-    isRecording = !isRecording;
+    if (recordButton.disabled) return;
     
-    if (isRecording) {
+    console.log('Record button clicked, current state:', isRecording);
+    
+    // Disable button and show loading state
+    recordButton.disabled = true;
+    const buttonText = recordButton.querySelector('.button-text');
+    const spinner = recordButton.querySelector('.spinner');
+    const icon = recordButton.querySelector('.fas');
+    
+    if (!isRecording) {
       // Start new session
       currentSessionId = generateSessionId();
+      buttonText.textContent = 'Starting...';
+      spinner.style.display = 'inline-block';
+      recordButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+      recordButton.classList.add('bg-gray-400');
+      
       chrome.storage.local.set({ 
-        isRecording,
+        isRecording: true,
         currentSessionId
       }, function() {
         console.log('Storage updated:', { isRecording, currentSessionId });
@@ -55,13 +67,22 @@ document.addEventListener('DOMContentLoaded', function() {
           sessionId: currentSessionId
         }, function(response) {
           console.log('Background response:', response);
+          isRecording = true;
           updateUI();
           updateSessionsList();
           startUpdating();
+          recordButton.disabled = false;
+          spinner.style.display = 'none';
+          showStatus('Recording started', 'success');
         });
       });
     } else {
       // Stop current session
+      buttonText.textContent = 'Stopping...';
+      spinner.style.display = 'inline-block';
+      recordButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+      recordButton.classList.add('bg-gray-400');
+      
       chrome.storage.local.set({ 
         isRecording: false,
         currentSessionId: null
@@ -72,10 +93,14 @@ document.addEventListener('DOMContentLoaded', function() {
           sessionId: currentSessionId
         }, function(response) {
           console.log('Background response:', response);
+          isRecording = false;
           currentSessionId = null;
           updateUI();
           stopUpdating();
           updateSessionsList();
+          recordButton.disabled = false;
+          spinner.style.display = 'none';
+          showStatus('Recording stopped', 'success');
         });
       });
     }
@@ -83,9 +108,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function updateUI() {
     console.log('Updating UI:', { isRecording, currentSessionId });
-    recordButton.textContent = isRecording ? 'Stop Recording' : 'Start Recording';
-    recordButton.classList.toggle('recording', isRecording);
-    statusDiv.textContent = isRecording ? 'Recording in progress...' : '';
+    const buttonText = recordButton.querySelector('.button-text');
+    const icon = recordButton.querySelector('.fas');
+    
+    buttonText.textContent = isRecording ? 'Stop Recording' : 'Start Recording';
+    
+    if (isRecording) {
+      recordButton.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'focus:ring-blue-500', 'bg-gray-400');
+      recordButton.classList.add('bg-red-600', 'hover:bg-red-700', 'focus:ring-red-500');
+      icon.classList.add('text-red-200', 'animate-pulse');
+    } else {
+      recordButton.classList.remove('bg-red-600', 'hover:bg-red-700', 'focus:ring-red-500', 'bg-gray-400');
+      recordButton.classList.add('bg-blue-600', 'hover:bg-blue-700', 'focus:ring-blue-500');
+      icon.classList.remove('text-red-200', 'animate-pulse');
+    }
+  }
+
+  function showStatus(message, type = 'info') {
+    statusDiv.textContent = message;
+    statusDiv.className = 'text-sm text-center h-6 fade-in ' + 
+      (type === 'success' ? 'text-green-600' : 
+       type === 'error' ? 'text-red-600' : 
+       'text-gray-600');
+    
+    setTimeout(() => {
+      statusDiv.textContent = '';
+    }, 3000);
   }
 });
 
@@ -96,7 +144,10 @@ function updateSessionsList() {
     console.log('Updating sessions list:', sessions);
     
     if (sessions.length === 0) {
-      sessionsList.innerHTML = '<div class="no-sessions">No recorded sessions yet</div>';
+      sessionsList.innerHTML = `
+        <div class="p-4 text-center text-gray-500 text-sm">
+          No recorded sessions yet
+        </div>`;
       return;
     }
 
@@ -109,22 +160,27 @@ function updateSessionsList() {
       const requests = networkData[session.id] || [];
       const requestCount = requests.length;
       
-      // Get the first request's domain (main tab domain)
       const mainDomain = requests.length > 0 ? 
         getDomainFromUrl(requests[0].url) : 
-        'Recording...'; // Show "Recording..." instead of "unknown"
+        'Recording...';
 
       return `
-        <div class="session-item" data-id="${session.id}">
-          <div class="session-info">
-            <div class="session-title">${mainDomain}</div>
-            <div class="session-details">
-              ${formatDateTime(session.startTime)} | ${requestCount} request${requestCount !== 1 ? 's' : ''}
+        <div class="session-item p-4 hover:bg-gray-50 transition-all duration-200" data-id="${session.id}">
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="font-medium text-gray-900">${mainDomain}</div>
+              <div class="text-sm text-gray-500 mt-1">
+                ${formatDateTime(session.startTime)} • ${requestCount} request${requestCount !== 1 ? 's' : ''}
+              </div>
             </div>
-          </div>
-          <div class="session-actions">
-            <button class="export-btn" data-action="export">Export</button>
-            <button class="delete-btn" data-action="delete">Delete</button>
+            <div class="flex space-x-2">
+              <button class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200" data-action="export">
+                <i class="fas fa-download mr-1"></i> Export
+              </button>
+              <button class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200" data-action="delete">
+                <i class="fas fa-trash-alt mr-1"></i> Delete
+              </button>
+            </div>
           </div>
         </div>
       `;
