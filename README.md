@@ -24,13 +24,22 @@ A lightweight Chrome extension for recording and exporting network traffic durin
 1. Clone this repository:
    ```bash
    git clone https://github.com/yourusername/bugtrace.git
+   cd bugtrace
    ```
 
-2. Open Chrome and navigate to `chrome://extensions/`
+2. Install dependencies and build the project:
+   ```bash
+   npm install
+   npm run build
+   ```
 
-3. Enable "Developer mode" in the top right
+3. Open Chrome and navigate to `chrome://extensions/`
 
-4. Click "Load unpacked" and select the cloned repository folder
+4. Enable "Developer mode" in the top right
+
+5. Click "Load unpacked" and select the `bugtrace` directory
+
+The extension should now appear in your Chrome toolbar.
 
 ## Usage
 
