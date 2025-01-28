@@ -1,7 +1,7 @@
 {
-  "name": "bugtrace",
+  "name": "azalea-bugtrace",
   "version": "1.0.0",
-  "description": "Record and export network traffic for debugging",
+  "description": "Record and export network activity for debugging",
   "scripts": {
     "build": "tailwindcss -i ./src/input.css -o ./dist/output.css",
     "watch": "tailwindcss -i ./src/input.css -o ./dist/output.css --watch"

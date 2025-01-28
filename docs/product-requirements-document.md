@@ -25,33 +25,45 @@
 
 ## 4. Export Format
 
-### 4.1 Main Export File: `network_summary.json`
+The extension exports captured data in a single JSON file with the following structure:
+
 ```json
 {
   "metadata": {
-    "start_time": "2025-01-26T19:30:11.123Z",
-    "end_time": "2025-01-26T19:35:22.456Z",
-    "total_requests": 42
+    "start_time": "2025-01-28T01:24:58.194Z",
+    "end_time": "2025-01-28T01:25:08.954Z",
+    "total_requests": 13
   },
   "requests": [
     {
-      "id": "#request123",
-      "timestamp": "2025-01-26T20:00:00.000Z",
-      "url": "https://api.example.com/data",
-      "method": "POST",
-      "payload": {
-        "key": "value"
-      },
-      "response_reference": "response_123.json"
+      "id": "2357",
+      "timestamp": "2025-01-28T01:24:59.301Z",
+      "url": "https://example.com/api/endpoint",
+      "method": "GET",
+      "type": "xmlhttprequest",
+      "tabId": 145549063,
+      "payload": {},
+      "stack_trace": "Error: ...",
+      "response": "response content"
     }
   ]
 }
 ```
 
-### 4.2 Detailed Response File: `response_[id].json`
-```json
-{
-  "stack_trace": "full stack trace",
-  "response": "full response"
-}
-```
+#### Data Fields
+
+- **metadata**: Session information
+  - `start_time`: Recording start timestamp (ISO 8601)
+  - `end_time`: Recording end timestamp (ISO 8601)
+  - `total_requests`: Total number of captured requests
+
+- **requests**: Array of captured requests
+  - `id`: Unique request identifier
+  - `timestamp`: Request timestamp (ISO 8601)
+  - `url`: Request URL
+  - `method`: HTTP method
+  - `type`: Request type (e.g., xmlhttprequest, fetch, image)
+  - `tabId`: Chrome tab identifier
+  - `payload`: Request payload data
+  - `stack_trace`: JavaScript stack trace at request time
+  - `response`: Response content

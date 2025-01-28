@@ -1,19 +1,26 @@
-# Bugtrace - Network Traffic Recording Chrome Extension
+# Bugtrace - Network Activity Recording Chrome Extension
 
-A lightweight Chrome extension for recording and exporting network traffic during debugging sessions. Perfect for developers who need to track and analyze network requests during development or troubleshooting.
+A lightweight Chrome extension for recording and exporting network activity during debugging sessions. Perfect for developers who need to track and analyze network requests during development or troubleshooting.
 
 ## Features
 
-- 🔴 One-click recording of network traffic
+- 🔴 One-click recording of network activity
 - 📊 Real-time request count updates
 - 🔍 Captures full request details including:
   - URL and method
   - Request payload (form data and JSON body)
   - Response status and headers
   - Stack trace for each request
-- 📦 Export data as a structured ZIP file containing:
-  - Complete network traffic summary
-  - Individual response files with stack traces
+- 📦 Export data as a structured JSON file containing:
+  - Session metadata (start/end time, total requests)
+  - Complete request details including:
+    - Request ID and timestamp
+    - URL and method
+    - Request type
+    - Tab ID
+    - Request payload
+    - Stack trace
+    - Response data
 - 🎯 Chrome Manifest V3 compliant
 - 🔒 Secure with proper CSP implementation
 - 💅 Modern UI with Tailwind CSS
@@ -44,16 +51,15 @@ The extension should now appear in your Chrome toolbar.
 ## Usage
 
 1. Click the Bugtrace icon in your Chrome toolbar
-2. Click "Start Recording" to begin capturing network traffic
+2. Click "Start Recording" to begin capturing network activity
 3. Perform the actions you want to debug
 4. Click "Stop Recording" when finished
-5. Click "Export" to download the captured data as a ZIP file
+5. Click "Export" to download the captured data as a JSON file
 
 ## Export Format
 
-The exported ZIP file contains:
+The exported JSON file contains:
 
-### network_summary.json
 ```json
 {
   "metadata": {
@@ -73,17 +79,11 @@ The exported ZIP file contains:
       },
       "response_status": 200,
       "response_headers": [...],
-      "response_reference": "response_123.json"
+      "response_reference": "response_123.json",
+      "stack_trace": "Error: ...",
+      "response": "response content (HTML/JSON/XML)"
     }
   ]
-}
-```
-
-### response_[id].json
-```json
-{
-  "stack_trace": "Error: ...",
-  "response": "response content (HTML/JSON/XML)"
 }
 ```
 

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "BugTrace",
+  "name": "Azalea Traffic Digest",
   "version": "1.0",
   "description": "Record and analyze network requests for debugging",
   "permissions": [
